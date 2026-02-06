@@ -55,10 +55,15 @@ export async function saveAdminSettings(data: {
   max_file_size_mb: number
   allowed_formats: string
 }) {
+  console.log("[v0] saveAdminSettings called with:", JSON.stringify(data))
   const authed = await isAuthenticated()
+  console.log("[v0] saveAdminSettings auth:", authed)
   if (!authed) throw new Error("Unauthorized")
   updateSettings(data)
+  const verify = getSettings()
+  console.log("[v0] saveAdminSettings after save:", JSON.stringify(verify))
   revalidatePath("/admin/settings")
+  revalidatePath("/")
 }
 
 export async function adminChangePassword(currentPassword: string, newPassword: string) {
