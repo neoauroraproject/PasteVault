@@ -1,15 +1,20 @@
-import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import React from "react"
+import type { Metadata, Viewport } from 'next'
+import { Inter } from 'next/font/google'
+import { Toaster } from 'sonner'
 
 import './globals.css'
 
-const _geist = Geist({ subsets: ['latin'] })
-const _geistMono = Geist_Mono({ subsets: ['latin'] })
+const _inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: 'ConfigVault - Admin Panel',
+  description: 'A minimal admin panel for managing configs and file uploads',
+}
+
+export const viewport: Viewport = {
+  themeColor: '#0f1318',
+  colorScheme: 'dark',
 }
 
 export default function RootLayout({
@@ -19,7 +24,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        {children}
+        <Toaster theme="dark" richColors position="bottom-right" />
+      </body>
     </html>
   )
 }
