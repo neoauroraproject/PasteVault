@@ -2,7 +2,7 @@
 
 import React, { useState } from "react"
 import { useRouter } from "next/navigation"
-import { saveAdminSettings, adminChangePassword } from "@/app/admin/actions"
+import { saveAdminSettings, adminChangePassword, saveSSLSettings } from "@/app/admin/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,6 +14,8 @@ interface SettingsData {
   uploads_enabled: boolean
   max_file_size_mb: number
   allowed_formats: string
+  ssl_cert_path: string
+  ssl_key_path: string
 }
 
 export function AdminSettingsForm({ settings }: { settings: SettingsData }) {
@@ -24,6 +26,11 @@ export function AdminSettingsForm({ settings }: { settings: SettingsData }) {
   const [maxSize, setMaxSize] = useState(String(settings.max_file_size_mb))
   const [formats, setFormats] = useState(settings.allowed_formats)
   const [savingSettings, setSavingSettings] = useState(false)
+
+  // SSL settings
+  const [sslCert, setSslCert] = useState(settings.ssl_cert_path || "")
+  const [sslKey, setSslKey] = useState(settings.ssl_key_path || "")
+  const [savingSSL, setSavingSSL] = useState(false)
 
   // Password change
   const [currentPw, setCurrentPw] = useState("")
@@ -73,6 +80,25 @@ export function AdminSettingsForm({ settings }: { settings: SettingsData }) {
       toast.error("Failed to change password")
     }
     setSavingPw(false)
+  }
+
+  async function handleSaveSSL(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingSSL(true)
+    try {
+      const result = await saveSSLSettings({
+        ssl_cert_path: sslCert.trim(),
+        ssl_key_path: sslKey.trim(),
+      })
+      if (result?.success === false) {
+        toast.error(result.error || "Failed to save SSL settings")
+      } else {
+        toast.success("SSL settings saved. Restart the service to apply.")
+      }
+    } catch {
+      toast.error("Failed to save SSL settings")
+    }
+    setSavingSSL(false)
   }
 
   return (
@@ -187,6 +213,61 @@ export function AdminSettingsForm({ settings }: { settings: SettingsData }) {
                 </span>
               ) : (
                 "Change Password"
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* SSL Settings */}
+      <Card className="bg-card">
+        <CardHeader>
+          <CardTitle className="text-base">SSL / HTTPS</CardTitle>
+          <CardDescription>
+            Configure SSL certificate paths for HTTPS. After saving, restart the service to apply.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSaveSSL} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="sslCert">Certificate Path</Label>
+              <Input
+                id="sslCert"
+                value={sslCert}
+                onChange={(e) => setSslCert(e.target.value)}
+                placeholder="/etc/letsencrypt/live/example.com/fullchain.pem"
+                className="bg-muted/50 font-mono text-xs"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="sslKey">Private Key Path</Label>
+              <Input
+                id="sslKey"
+                value={sslKey}
+                onChange={(e) => setSslKey(e.target.value)}
+                placeholder="/etc/letsencrypt/live/example.com/privkey.pem"
+                className="bg-muted/50 font-mono text-xs"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Leave both empty to run on HTTP only. After saving, run{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
+                sudo systemctl restart pastevault
+              </code>{" "}
+              to apply changes.
+            </p>
+            <Button
+              type="submit"
+              disabled={savingSSL}
+              className="w-fit transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+            >
+              {savingSSL ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+                  Saving...
+                </span>
+              ) : (
+                "Save SSL Settings"
               )}
             </Button>
           </form>
