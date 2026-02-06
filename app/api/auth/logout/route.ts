@@ -1,7 +1,12 @@
-import { logout } from "@/lib/auth"
+import { deleteSession } from "@/lib/db"
 import { NextResponse } from "next/server"
+import { cookies } from "next/headers"
 
 export async function POST() {
-  await logout()
-  return NextResponse.json({ success: true })
+  const cookieStore = await cookies()
+  const sessionId = cookieStore.get("cv_session")?.value
+  if (sessionId) deleteSession(sessionId)
+  const response = NextResponse.json({ success: true })
+  response.cookies.delete("cv_session")
+  return response
 }

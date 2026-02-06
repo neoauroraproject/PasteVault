@@ -1,7 +1,5 @@
-import { getSettings, createFileRecord, getUploadsDir } from "@/lib/db"
+import { getSettings, createFileRecord } from "@/lib/db"
 import { NextResponse } from "next/server"
-import fs from "fs"
-import path from "path"
 import crypto from "crypto"
 
 export async function POST(request: Request) {
@@ -30,7 +28,10 @@ export async function POST(request: Request) {
 
     // Check file format
     const ext = file.name.split(".").pop()?.toLowerCase() || ""
-    const allowedFormats = settings.allowed_formats.split(",").map((f) => f.trim().toLowerCase()).filter(Boolean)
+    const allowedFormats = settings.allowed_formats
+      .split(",")
+      .map((f: string) => f.trim().toLowerCase())
+      .filter(Boolean)
     if (allowedFormats.length > 0 && !allowedFormats.includes(ext)) {
       return NextResponse.json(
         { error: `File type .${ext} is not allowed. Allowed: ${allowedFormats.join(", ")}` },
@@ -38,13 +39,18 @@ export async function POST(request: Request) {
       )
     }
 
-    // Save file
-    const uploadsDir = getUploadsDir()
+    // Store file as base64 in memory
     const storedName = `${Date.now()}-${crypto.randomUUID()}.${ext}`
     const buffer = Buffer.from(await file.arrayBuffer())
-    fs.writeFileSync(path.join(uploadsDir, storedName), buffer)
+    const base64Data = buffer.toString("base64")
 
-    const record = createFileRecord(file.name, storedName, file.size, file.type || "application/octet-stream")
+    const record = createFileRecord(
+      file.name,
+      storedName,
+      file.size,
+      file.type || "application/octet-stream",
+      base64Data
+    )
 
     return NextResponse.json({ success: true, id: record.id, name: file.name, size: file.size })
   } catch {
