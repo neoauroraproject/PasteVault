@@ -1,12 +1,20 @@
 import crypto from "crypto"
 
 // ---- Types ----
+export interface PasteAttachment {
+  file_id: string
+  name: string
+  size: number
+  mime_type: string
+}
+
 export interface Paste {
   id: string
   content: string
   language: string
   password: string | null
   expires_at: string | null
+  attachments: PasteAttachment[]
   created_at: string
 }
 
@@ -35,6 +43,14 @@ interface Store {
 }
 
 // ---- Helpers ----
+function shortId(len = 6): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
+  let result = ""
+  const bytes = crypto.randomBytes(len)
+  for (let i = 0; i < len; i++) result += chars[bytes[i] % chars.length]
+  return result
+}
+
 function hashPassword(pw: string): string {
   return crypto.createHash("sha256").update(pw).digest("hex")
 }
@@ -107,14 +123,16 @@ export function createPaste(
   content: string,
   language: string,
   password: string | null,
-  expiresAt: string | null
+  expiresAt: string | null,
+  attachments: PasteAttachment[] = []
 ): Paste {
   const paste: Paste = {
-    id: crypto.randomUUID(),
+    id: shortId(6),
     content,
     language,
     password: password || null,
     expires_at: expiresAt || null,
+    attachments,
     created_at: new Date().toISOString(),
   }
   store.pastes.unshift(paste)
@@ -145,7 +163,7 @@ export function createFileRecord(
   base64Data: string
 ): UploadedFile {
   const file: UploadedFile = {
-    id: crypto.randomUUID(),
+    id: shortId(8),
     original_name: originalName,
     stored_name: storedName,
     file_size: fileSize,

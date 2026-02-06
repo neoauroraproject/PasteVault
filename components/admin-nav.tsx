@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Shield, FileText, Upload, Settings, LogOut } from "lucide-react"
+import { Shield, FileText, Upload, Settings, LogOut, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -23,11 +23,18 @@ export function AdminNav() {
   }
 
   return (
-    <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3 md:px-8">
+    <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3 shadow-sm md:px-8">
       <div className="flex items-center gap-6">
-        <Link href="/admin" className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-primary" />
-          <span className="text-sm font-semibold text-foreground">PasteVault Admin</span>
+        <Link
+          href="/admin"
+          className="flex items-center gap-2 transition-opacity hover:opacity-80"
+        >
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+            <Shield className="h-4 w-4 text-primary" />
+          </div>
+          <span className="text-sm font-semibold text-foreground hidden sm:inline">
+            PasteVault Admin
+          </span>
         </Link>
         <nav className="flex items-center gap-1">
           {navItems.map((item) => {
@@ -41,8 +48,8 @@ export function AdminNav() {
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "gap-2 text-muted-foreground hover:text-foreground",
-                    isActive && "text-foreground bg-muted"
+                    "gap-2 text-muted-foreground transition-all duration-200 hover:text-foreground",
+                    isActive && "bg-muted text-foreground shadow-sm"
                   )}
                 >
                   <item.icon className="h-4 w-4" />
@@ -53,17 +60,22 @@ export function AdminNav() {
           })}
         </nav>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         <Link href="/">
-          <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-foreground">
-            View Site
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-xs text-muted-foreground transition-all duration-200 hover:text-foreground"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            <span className="hidden md:inline">View Site</span>
           </Button>
         </Link>
         <Button
           variant="ghost"
           size="sm"
           onClick={handleLogout}
-          className="gap-2 text-muted-foreground hover:text-foreground"
+          className="gap-2 text-muted-foreground transition-all duration-200 hover:text-destructive"
         >
           <LogOut className="h-4 w-4" />
           <span className="hidden md:inline">Logout</span>

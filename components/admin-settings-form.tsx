@@ -111,8 +111,19 @@ export function AdminSettingsForm({ settings }: { settings: SettingsData }) {
               />
               <p className="text-xs text-muted-foreground">Comma-separated list of file extensions</p>
             </div>
-            <Button type="submit" disabled={savingSettings} className="w-fit">
-              {savingSettings ? "Saving..." : "Save Settings"}
+            <Button
+              type="submit"
+              disabled={savingSettings}
+              className="w-fit transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+            >
+              {savingSettings ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+                  Saving...
+                </span>
+              ) : (
+                "Save Settings"
+              )}
             </Button>
           </form>
         </CardContent>
@@ -160,8 +171,19 @@ export function AdminSettingsForm({ settings }: { settings: SettingsData }) {
                 className="bg-muted/50"
               />
             </div>
-            <Button type="submit" disabled={savingPw} className="w-fit">
-              {savingPw ? "Changing..." : "Change Password"}
+            <Button
+              type="submit"
+              disabled={savingPw}
+              className="w-fit transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+            >
+              {savingPw ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+                  Changing...
+                </span>
+              ) : (
+                "Change Password"
+              )}
             </Button>
           </form>
         </CardContent>

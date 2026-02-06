@@ -52,7 +52,13 @@ export async function POST(request: Request) {
       base64Data
     )
 
-    return NextResponse.json({ success: true, id: record.id, name: file.name, size: file.size })
+    return NextResponse.json({
+      success: true,
+      id: record.id,
+      name: file.name,
+      size: file.size,
+      mime_type: file.type || "application/octet-stream",
+    })
   } catch {
     return NextResponse.json({ error: "Upload failed" }, { status: 500 })
   }

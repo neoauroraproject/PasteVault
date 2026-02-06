@@ -1,7 +1,10 @@
 import { getPaste } from "@/lib/db"
 import { NextResponse } from "next/server"
 
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const { id } = await params
   const paste = getPaste(id)
 
@@ -9,7 +12,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Paste not found or expired" }, { status: 404 })
   }
 
-  // If password-protected, require password
   if (paste.password) {
     try {
       const body = await request.json()
@@ -26,11 +28,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     content: paste.content,
     language: paste.language,
     has_password: !!paste.password,
+    attachments: paste.attachments || [],
     created_at: paste.created_at,
   })
 }
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const { id } = await params
   const paste = getPaste(id)
 
@@ -43,7 +49,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     has_password: !!paste.password,
     language: paste.language,
     created_at: paste.created_at,
-    // Only send content if not password protected
+    attachments: paste.password ? [] : paste.attachments || [],
     ...(paste.password ? {} : { content: paste.content }),
   })
 }
