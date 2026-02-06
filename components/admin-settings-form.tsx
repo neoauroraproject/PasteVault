@@ -35,12 +35,16 @@ export function AdminSettingsForm({ settings }: { settings: SettingsData }) {
     e.preventDefault()
     setSavingSettings(true)
     try {
-      await saveAdminSettings({
+      const result = await saveAdminSettings({
         uploads_enabled: uploadsEnabled,
         max_file_size_mb: Number(maxSize) || 50,
         allowed_formats: formats,
       })
-      toast.success("Settings saved")
+      if (result?.success === false) {
+        toast.error(result.error || "Failed to save")
+      } else {
+        toast.success("Settings saved")
+      }
       router.refresh()
     } catch {
       toast.error("Failed to save settings")

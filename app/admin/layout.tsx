@@ -8,7 +8,12 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const authed = await isAuthenticated()
+  let authed = false
+  try {
+    authed = await isAuthenticated()
+  } catch {
+    authed = false
+  }
   if (!authed) redirect("/auth/login")
 
   return (
