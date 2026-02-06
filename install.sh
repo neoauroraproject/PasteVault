@@ -134,6 +134,7 @@ cp "$CONFIG_FILE" "$INSTALL_DIR/.env"
 echo "  [5/6] Installing dependencies & building..."
 cd "$INSTALL_DIR"
 pnpm install --no-frozen-lockfile 2>&1 | tail -3
+pnpm add better-sqlite3 2>&1 | tail -3
 pnpm run build 2>&1 | tail -5
 
 # ---- Standalone setup ----
