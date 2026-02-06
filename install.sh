@@ -6,8 +6,19 @@ set -e
 #  bash <(curl -Ls https://raw.githubusercontent.com/neoauroraproject/PasteVault/main/install.sh)
 # ============================================================
 
+# Safety check: if this script was served as a 404 page, exit gracefully
+if echo "$0" | grep -q "^/dev/fd"; then
+  if ! grep -q "PasteVault" "$0" 2>/dev/null; then
+    echo "  ERROR: Failed to download install script."
+    echo "  The file may not exist on the 'main' branch yet."
+    echo ""
+    echo "  Try:"
+    echo "  bash <(curl -Ls https://raw.githubusercontent.com/neoauroraproject/PasteVault/v0/hmrayserver-6526-51e68a2f/install.sh)"
+    exit 1
+  fi
+fi
+
 REPO="https://github.com/neoauroraproject/PasteVault.git"
-# Auto-detect branch: try main first, fallback to v0 branch
 BRANCH="main"
 INSTALL_DIR="/opt/pastevault"
 SERVICE_NAME="pastevault"
