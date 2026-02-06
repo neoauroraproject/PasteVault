@@ -13,8 +13,13 @@ export default async function AdminLayout({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <AdminNav />
+      <AdminNav githubUrl="https://github.com" />
       <main className="flex-1 px-4 py-6 md:px-8">{children}</main>
+      <footer className="border-t border-border px-4 py-4 md:px-8">
+        <p className="text-center text-xs text-muted-foreground">
+          PasteVault &copy; {new Date().getFullYear()} &mdash; All rights reserved.
+        </p>
+      </footer>
     </div>
   )
 }

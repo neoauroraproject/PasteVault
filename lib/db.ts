@@ -39,7 +39,6 @@ interface Store {
   pastes: Paste[]
   files: UploadedFile[]
   settings: Settings
-  sessions: Record<string, string>
 }
 
 // ---- Helpers ----
@@ -55,6 +54,8 @@ function hashPassword(pw: string): string {
   return crypto.createHash("sha256").update(pw).digest("hex")
 }
 
+const SECRET = process.env.SESSION_SECRET || "pastevault-secret-key-change-in-production"
+
 const DEFAULT_SETTINGS: Settings = {
   admin_password_hash: hashPassword("admin"),
   uploads_enabled: true,
@@ -62,15 +63,14 @@ const DEFAULT_SETTINGS: Settings = {
   allowed_formats: "jpg,jpeg,png,gif,webp,pdf,zip,rar,7z,txt,doc,docx,xls,xlsx,mp3,mp4",
 }
 
-// ---- In-memory store (persists across requests in a single server process) ----
+// ---- In-memory store ----
 const store: Store = {
   pastes: [],
   files: [],
   settings: { ...DEFAULT_SETTINGS },
-  sessions: {},
 }
 
-// ---- Auth ----
+// ---- Auth (HMAC-signed tokens, no session store needed) ----
 export function verifyPassword(password: string): boolean {
   return hashPassword(password) === store.settings.admin_password_hash
 }
@@ -79,25 +79,26 @@ export function changeAdminPassword(newPassword: string) {
   store.settings.admin_password_hash = hashPassword(newPassword)
 }
 
-export function createSession(): string {
-  const id = crypto.randomUUID()
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-  store.sessions[id] = expiresAt
-  return id
+export function createSessionToken(): string {
+  const expires = Date.now() + 7 * 24 * 60 * 60 * 1000
+  const payload = `admin:${expires}`
+  const signature = crypto.createHmac("sha256", SECRET).update(payload).digest("hex")
+  return `${Buffer.from(payload).toString("base64")}.${signature}`
 }
 
-export function validateSession(sessionId: string): boolean {
-  const expiresAt = store.sessions[sessionId]
-  if (!expiresAt) return false
-  if (new Date(expiresAt) < new Date()) {
-    delete store.sessions[sessionId]
+export function validateSessionToken(token: string): boolean {
+  try {
+    const [payloadB64, signature] = token.split(".")
+    if (!payloadB64 || !signature) return false
+    const payload = Buffer.from(payloadB64, "base64").toString("utf-8")
+    const expectedSig = crypto.createHmac("sha256", SECRET).update(payload).digest("hex")
+    if (signature !== expectedSig) return false
+    const parts = payload.split(":")
+    const expires = parseInt(parts[1], 10)
+    return Date.now() < expires
+  } catch {
     return false
   }
-  return true
-}
-
-export function deleteSession(sessionId: string) {
-  delete store.sessions[sessionId]
 }
 
 // ---- Settings ----

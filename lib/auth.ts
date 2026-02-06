@@ -1,11 +1,11 @@
 "use server"
 
 import { cookies } from "next/headers"
-import { validateSession } from "./db"
+import { validateSessionToken } from "./db"
 
 export async function isAuthenticated(): Promise<boolean> {
   const cookieStore = await cookies()
-  const sessionId = cookieStore.get("cv_session")?.value
-  if (!sessionId) return false
-  return validateSession(sessionId)
+  const token = cookieStore.get("cv_session")?.value
+  if (!token) return false
+  return validateSessionToken(token)
 }

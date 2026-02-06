@@ -1,9 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Shield, FileText, Upload, Settings, LogOut, ExternalLink } from "lucide-react"
+import { Shield, FileText, Upload, Settings, LogOut, ExternalLink, Github } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -12,14 +12,12 @@ const navItems = [
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ]
 
-export function AdminNav() {
+export function AdminNav({ githubUrl }: { githubUrl?: string }) {
   const pathname = usePathname()
-  const router = useRouter()
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" })
-    router.push("/auth/login")
-    router.refresh()
+    window.location.href = "/auth/login"
   }
 
   return (
@@ -61,6 +59,18 @@ export function AdminNav() {
         </nav>
       </div>
       <div className="flex items-center gap-1">
+        {githubUrl && (
+          <a href={githubUrl} target="_blank" rel="noopener noreferrer">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-xs text-muted-foreground transition-all duration-200 hover:text-foreground"
+            >
+              <Github className="h-4 w-4" />
+              <span className="hidden md:inline">GitHub</span>
+            </Button>
+          </a>
+        )}
         <Link href="/">
           <Button
             variant="ghost"
