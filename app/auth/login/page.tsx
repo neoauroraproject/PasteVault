@@ -27,24 +27,19 @@ export default function LoginPage() {
     setError("")
 
     try {
-      console.log("[v0] Sending login request...")
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
       })
-      console.log("[v0] Login response status:", res.status)
       const data = await res.json()
-      console.log("[v0] Login response data:", data)
       if (!res.ok) {
         setError(data.error || "Login failed")
         setLoading(false)
         return
       }
-      console.log("[v0] Login success, navigating to /admin")
       window.location.href = "/admin"
-    } catch (err) {
-      console.log("[v0] Login client error:", err)
+    } catch {
       setError("Something went wrong")
       setLoading(false)
     }

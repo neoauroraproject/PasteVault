@@ -1,15 +1,13 @@
+// PasteVault middleware - no external dependencies
 import { type NextRequest, NextResponse } from "next/server"
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Only protect /admin routes
   if (pathname.startsWith("/admin")) {
-    const sessionCookie = request.cookies.get("cv_session")
-
-    if (!sessionCookie?.value) {
-      const loginUrl = new URL("/auth/login", request.url)
-      return NextResponse.redirect(loginUrl)
+    const token = request.cookies.get("cv_session")?.value
+    if (!token) {
+      return NextResponse.redirect(new URL("/auth/login", request.url))
     }
   }
 
