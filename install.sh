@@ -7,6 +7,7 @@ set -e
 # ============================================================
 
 REPO="https://github.com/neoauroraproject/PasteVault.git"
+# Auto-detect branch: try main first, fallback to v0 branch
 BRANCH="main"
 INSTALL_DIR="/opt/pastevault"
 SERVICE_NAME="pastevault"
@@ -144,7 +145,10 @@ fi
 # ---- Clone from GitHub ----
 echo "  [5/7] Downloading PasteVault..."
 rm -rf /tmp/pastevault_src
-git clone --depth 1 -b "$BRANCH" "$REPO" /tmp/pastevault_src 2>/dev/null
+if ! git clone --depth 1 -b "$BRANCH" "$REPO" /tmp/pastevault_src 2>/dev/null; then
+  echo "         Branch '$BRANCH' not found, trying default branch..."
+  git clone --depth 1 "$REPO" /tmp/pastevault_src 2>/dev/null
+fi
 
 mkdir -p "$INSTALL_DIR"
 rsync -a --exclude='data' --exclude='config.env' --exclude='.env' --exclude='node_modules' /tmp/pastevault_src/ "$INSTALL_DIR/" 2>/dev/null || \
