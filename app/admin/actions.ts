@@ -54,6 +54,8 @@ export async function getAdminSettings() {
       uploads_enabled: true,
       max_file_size_mb: 50,
       allowed_formats: "",
+      ssl_cert_path: "",
+      ssl_key_path: "",
     }
   }
   const s = getSettings()
@@ -61,6 +63,8 @@ export async function getAdminSettings() {
     uploads_enabled: s.uploads_enabled,
     max_file_size_mb: s.max_file_size_mb,
     allowed_formats: s.allowed_formats,
+    ssl_cert_path: s.ssl_cert_path || "",
+    ssl_key_path: s.ssl_key_path || "",
   }
 }
 
@@ -74,6 +78,17 @@ export async function saveAdminSettings(data: {
   updateSettings(data)
   revalidatePath("/admin/settings")
   revalidatePath("/")
+  return { success: true }
+}
+
+export async function saveSSLSettings(data: { ssl_cert_path: string; ssl_key_path: string }) {
+  const authed = await requireAuth()
+  if (!authed) return { success: false, error: "Unauthorized" }
+  updateSettings({
+    ssl_cert_path: data.ssl_cert_path,
+    ssl_key_path: data.ssl_key_path,
+  })
+  revalidatePath("/admin/settings")
   return { success: true }
 }
 

@@ -34,6 +34,8 @@ export interface Settings {
   uploads_enabled: boolean
   max_file_size_mb: number
   allowed_formats: string
+  ssl_cert_path: string
+  ssl_key_path: string
 }
 
 // ---- Helpers ----
@@ -57,6 +59,8 @@ const DEFAULT_SETTINGS: Settings = {
   uploads_enabled: true,
   max_file_size_mb: 50,
   allowed_formats: "jpg,jpeg,png,gif,webp,pdf,zip,rar,7z,txt,doc,docx,xls,xlsx,mp3,mp4",
+  ssl_cert_path: "",
+  ssl_key_path: "",
 }
 
 // ============================================================
@@ -206,24 +210,30 @@ export function getSettings(): Omit<Settings, "admin_password_hash"> {
       uploads_enabled: map.uploads_enabled !== "false",
       max_file_size_mb: Number(map.max_file_size_mb) || 50,
       allowed_formats: map.allowed_formats || DEFAULT_SETTINGS.allowed_formats,
+      ssl_cert_path: map.ssl_cert_path || "",
+      ssl_key_path: map.ssl_key_path || "",
     }
   }
   const s = memSettings()
-  return { uploads_enabled: s.uploads_enabled, max_file_size_mb: s.max_file_size_mb, allowed_formats: s.allowed_formats }
+  return { uploads_enabled: s.uploads_enabled, max_file_size_mb: s.max_file_size_mb, allowed_formats: s.allowed_formats, ssl_cert_path: s.ssl_cert_path, ssl_key_path: s.ssl_key_path }
 }
 
-export function updateSettings(updates: Partial<Pick<Settings, "uploads_enabled" | "max_file_size_mb" | "allowed_formats">>) {
+export function updateSettings(updates: Partial<Pick<Settings, "uploads_enabled" | "max_file_size_mb" | "allowed_formats" | "ssl_cert_path" | "ssl_key_path">>) {
   if (useSqlite) {
     const stmt = sqliteDb.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)")
     if (updates.uploads_enabled !== undefined) stmt.run("uploads_enabled", String(updates.uploads_enabled))
     if (updates.max_file_size_mb !== undefined) stmt.run("max_file_size_mb", String(updates.max_file_size_mb))
     if (updates.allowed_formats !== undefined) stmt.run("allowed_formats", updates.allowed_formats)
+    if (updates.ssl_cert_path !== undefined) stmt.run("ssl_cert_path", updates.ssl_cert_path)
+    if (updates.ssl_key_path !== undefined) stmt.run("ssl_key_path", updates.ssl_key_path)
     return
   }
   const s = memSettings()
   if (updates.uploads_enabled !== undefined) s.uploads_enabled = updates.uploads_enabled
   if (updates.max_file_size_mb !== undefined) s.max_file_size_mb = updates.max_file_size_mb
   if (updates.allowed_formats !== undefined) s.allowed_formats = updates.allowed_formats
+  if (updates.ssl_cert_path !== undefined) s.ssl_cert_path = updates.ssl_cert_path
+  if (updates.ssl_key_path !== undefined) s.ssl_key_path = updates.ssl_key_path
 }
 
 // ============================================================
