@@ -15,10 +15,21 @@ export default function Home() {
         </p>
       </div>
       <PasteBox />
-      <footer className="mt-12 text-center text-xs text-muted-foreground">
+      <footer className="mt-12 flex flex-col items-center gap-2 text-center text-xs text-muted-foreground">
         <Link href="/auth/login" className="transition-colors hover:text-foreground">
           Admin
         </Link>
+        <p>
+          Design and developed by{" "}
+          <a
+            href="https://t.me/hmrayserver"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-foreground underline underline-offset-2 transition-colors hover:text-primary"
+          >
+            Hmray
+          </a>
+        </p>
       </footer>
     </main>
   )

@@ -17,7 +17,15 @@ export default async function AdminLayout({
       <main className="flex-1 px-4 py-6 md:px-8">{children}</main>
       <footer className="border-t border-border px-4 py-4 md:px-8">
         <p className="text-center text-xs text-muted-foreground">
-          PasteVault &copy; {new Date().getFullYear()} &mdash; All rights reserved.
+          Design and developed by{" "}
+          <a
+            href="https://t.me/hmrayserver"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-foreground underline underline-offset-2 transition-colors hover:text-primary"
+          >
+            Hmray
+          </a>
         </p>
       </footer>
     </div>

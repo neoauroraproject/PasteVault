@@ -24,7 +24,7 @@ export interface UploadedFile {
   stored_name: string
   file_size: number
   mime_type: string
-  data: string // base64 encoded file data
+  data: string
   created_at: string
 }
 
@@ -33,12 +33,6 @@ export interface Settings {
   uploads_enabled: boolean
   max_file_size_mb: number
   allowed_formats: string
-}
-
-interface Store {
-  pastes: Paste[]
-  files: UploadedFile[]
-  settings: Settings
 }
 
 // ---- Helpers ----
@@ -63,20 +57,35 @@ const DEFAULT_SETTINGS: Settings = {
   allowed_formats: "jpg,jpeg,png,gif,webp,pdf,zip,rar,7z,txt,doc,docx,xls,xlsx,mp3,mp4",
 }
 
-// ---- In-memory store ----
-const store: Store = {
-  pastes: [],
-  files: [],
-  settings: { ...DEFAULT_SETTINGS },
+// ---- Global store (survives across requests in same process) ----
+const globalStore = globalThis as unknown as {
+  __pv_pastes?: Paste[]
+  __pv_files?: UploadedFile[]
+  __pv_settings?: Settings
 }
 
-// ---- Auth (HMAC-signed tokens, no session store needed) ----
+function getPastes(): Paste[] {
+  if (!globalStore.__pv_pastes) globalStore.__pv_pastes = []
+  return globalStore.__pv_pastes
+}
+
+function getFiles(): UploadedFile[] {
+  if (!globalStore.__pv_files) globalStore.__pv_files = []
+  return globalStore.__pv_files
+}
+
+function getSettingsStore(): Settings {
+  if (!globalStore.__pv_settings) globalStore.__pv_settings = { ...DEFAULT_SETTINGS }
+  return globalStore.__pv_settings
+}
+
+// ---- Auth ----
 export function verifyPassword(password: string): boolean {
-  return hashPassword(password) === store.settings.admin_password_hash
+  return hashPassword(password) === getSettingsStore().admin_password_hash
 }
 
 export function changeAdminPassword(newPassword: string) {
-  store.settings.admin_password_hash = hashPassword(newPassword)
+  getSettingsStore().admin_password_hash = hashPassword(newPassword)
 }
 
 export function createSessionToken(): string {
@@ -103,20 +112,25 @@ export function validateSessionToken(token: string): boolean {
 
 // ---- Settings ----
 export function getSettings(): Omit<Settings, "admin_password_hash"> {
-  const { admin_password_hash: _, ...rest } = store.settings
-  return rest
+  const s = getSettingsStore()
+  return {
+    uploads_enabled: s.uploads_enabled,
+    max_file_size_mb: s.max_file_size_mb,
+    allowed_formats: s.allowed_formats,
+  }
 }
 
 export function getFullSettings(): Settings {
-  return { ...store.settings }
+  return { ...getSettingsStore() }
 }
 
 export function updateSettings(
   updates: Partial<Pick<Settings, "uploads_enabled" | "max_file_size_mb" | "allowed_formats">>
 ) {
-  if (updates.uploads_enabled !== undefined) store.settings.uploads_enabled = updates.uploads_enabled
-  if (updates.max_file_size_mb !== undefined) store.settings.max_file_size_mb = updates.max_file_size_mb
-  if (updates.allowed_formats !== undefined) store.settings.allowed_formats = updates.allowed_formats
+  const s = getSettingsStore()
+  if (updates.uploads_enabled !== undefined) s.uploads_enabled = updates.uploads_enabled
+  if (updates.max_file_size_mb !== undefined) s.max_file_size_mb = updates.max_file_size_mb
+  if (updates.allowed_formats !== undefined) s.allowed_formats = updates.allowed_formats
 }
 
 // ---- Pastes ----
@@ -136,23 +150,25 @@ export function createPaste(
     attachments,
     created_at: new Date().toISOString(),
   }
-  store.pastes.unshift(paste)
+  getPastes().unshift(paste)
   return paste
 }
 
 export function getPaste(id: string): Paste | null {
-  const paste = store.pastes.find((p) => p.id === id)
+  const paste = getPastes().find((p) => p.id === id)
   if (!paste) return null
   if (paste.expires_at && new Date(paste.expires_at) < new Date()) return null
   return paste
 }
 
 export function getAllPastes(): Paste[] {
-  return [...store.pastes]
+  return [...getPastes()]
 }
 
 export function deletePaste(id: string) {
-  store.pastes = store.pastes.filter((p) => p.id !== id)
+  const arr = getPastes()
+  const idx = arr.findIndex((p) => p.id === id)
+  if (idx !== -1) arr.splice(idx, 1)
 }
 
 // ---- Files ----
@@ -172,18 +188,20 @@ export function createFileRecord(
     data: base64Data,
     created_at: new Date().toISOString(),
   }
-  store.files.unshift(file)
+  getFiles().unshift(file)
   return file
 }
 
 export function getFile(id: string): UploadedFile | null {
-  return store.files.find((f) => f.id === id) || null
+  return getFiles().find((f) => f.id === id) || null
 }
 
 export function getAllFiles(): UploadedFile[] {
-  return store.files.map(({ data: _, ...rest }) => ({ ...rest, data: "" }))
+  return getFiles().map(({ data: _, ...rest }) => ({ ...rest, data: "" }))
 }
 
 export function deleteFileRecord(id: string) {
-  store.files = store.files.filter((f) => f.id !== id)
+  const arr = getFiles()
+  const idx = arr.findIndex((f) => f.id === id)
+  if (idx !== -1) arr.splice(idx, 1)
 }
