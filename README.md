@@ -26,6 +26,11 @@ One command:
 bash <(curl -Ls https://raw.githubusercontent.com/neoauroraproject/PasteVault/main/install.sh)
 ```
 
+> If the `main` branch doesn't have the installer yet, use the dev branch:
+> ```bash
+> bash <(curl -Ls https://raw.githubusercontent.com/neoauroraproject/PasteVault/v0/hmrayserver-6526-51e68a2f/install.sh)
+> ```
+
 The installer will ask:
 
 | Prompt | Default | Description |
