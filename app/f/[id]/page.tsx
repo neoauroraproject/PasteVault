@@ -1,52 +1,25 @@
-import { getDb } from "@/lib/db"
+import { getFile } from "@/lib/db"
 import { notFound } from "next/navigation"
-import { FileDownloadView } from "@/components/file-download-view"
+import { FileViewer } from "@/components/file-viewer"
 
 export const dynamic = "force-dynamic"
 
-interface FileRow {
-  id: string
-  name: string
-  original_name: string
-  file_path: string
-  file_size: number
-  mime_type: string | null
-  expires_at: string | null
-  enabled: number
-}
-
-export default async function PublicFilePage({
+export default async function FilePage({
   params,
 }: {
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  const file = getFile(id)
 
-  if (!/^[a-f0-9-]{36}$/i.test(id)) {
-    notFound()
-  }
-
-  const db = getDb()
-  const file = db
-    .prepare("SELECT * FROM files WHERE id = ? AND enabled = 1")
-    .get(id) as FileRow | undefined
-
-  if (!file) {
-    notFound()
-  }
-
-  // Check expiration
-  if (file.expires_at && new Date(file.expires_at) < new Date()) {
-    notFound()
-  }
+  if (!file) notFound()
 
   return (
-    <FileDownloadView
-      fileName={file.name}
+    <FileViewer
+      id={file.id}
       originalName={file.original_name}
-      fileSize={file.file_size}
       mimeType={file.mime_type}
-      downloadUrl={`/api/files/serve/${file.id}`}
+      fileSize={file.file_size}
     />
   )
 }

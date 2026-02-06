@@ -1,105 +1,78 @@
 "use server"
 
-import { getDb, UPLOADS_DIR } from "@/lib/db"
-import { getSession } from "@/lib/auth"
+import { isAuthenticated } from "@/lib/auth"
+import {
+  getAllPastes,
+  deletePaste,
+  getAllFiles,
+  deleteFileRecord,
+  getSettings,
+  updateSettings,
+  changeAdminPassword,
+  verifyPassword,
+} from "@/lib/db"
 import { revalidatePath } from "next/cache"
-import { v4 as uuid } from "uuid"
-import fs from "fs"
-import path from "path"
 
-export async function createConfig(formData: FormData) {
-  const user = await getSession()
-  if (!user) throw new Error("Unauthorized")
+export async function getAdminPastes() {
+  const authed = await isAuthenticated()
+  if (!authed) throw new Error("Unauthorized")
+  return getAllPastes()
+}
 
-  const name = formData.get("name") as string
-  const content = formData.get("content") as string
-  const password = (formData.get("password") as string) || null
-  const expiresAt = (formData.get("expires_at") as string) || null
-
-  if (!name || !content) throw new Error("Name and content are required")
-
-  const db = getDb()
-  const id = uuid()
-  db.prepare(
-    `INSERT INTO configs (id, name, content, password, expires_at, enabled) 
-     VALUES (?, ?, ?, ?, ?, 1)`
-  ).run(id, name.trim(), content, password || null, expiresAt || null)
-
+export async function adminDeletePaste(id: string) {
+  const authed = await isAuthenticated()
+  if (!authed) throw new Error("Unauthorized")
+  deletePaste(id)
   revalidatePath("/admin")
 }
 
-export async function updateConfig(formData: FormData) {
-  const user = await getSession()
-  if (!user) throw new Error("Unauthorized")
-
-  const id = formData.get("id") as string
-  const name = formData.get("name") as string
-  const content = formData.get("content") as string
-  const password = (formData.get("password") as string) || null
-  const expiresAt = (formData.get("expires_at") as string) || null
-
-  if (!id || !name || !content) throw new Error("Missing fields")
-
-  const db = getDb()
-  db.prepare(
-    `UPDATE configs SET name = ?, content = ?, password = ?, expires_at = ?, updated_at = datetime('now') 
-     WHERE id = ?`
-  ).run(name.trim(), content, password || null, expiresAt || null, id)
-
-  revalidatePath("/admin")
+export async function getAdminFiles() {
+  const authed = await isAuthenticated()
+  if (!authed) throw new Error("Unauthorized")
+  return getAllFiles()
 }
 
-export async function toggleConfig(id: string, enabled: boolean) {
-  const user = await getSession()
-  if (!user) throw new Error("Unauthorized")
-
-  const db = getDb()
-  db.prepare(
-    `UPDATE configs SET enabled = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(enabled ? 1 : 0, id)
-
-  revalidatePath("/admin")
-}
-
-export async function deleteConfig(id: string) {
-  const user = await getSession()
-  if (!user) throw new Error("Unauthorized")
-
-  const db = getDb()
-  db.prepare("DELETE FROM configs WHERE id = ?").run(id)
-  revalidatePath("/admin")
-}
-
-export async function toggleFile(id: string, enabled: boolean) {
-  const user = await getSession()
-  if (!user) throw new Error("Unauthorized")
-
-  const db = getDb()
-  db.prepare(
-    `UPDATE files SET enabled = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(enabled ? 1 : 0, id)
-
+export async function adminDeleteFile(id: string) {
+  const authed = await isAuthenticated()
+  if (!authed) throw new Error("Unauthorized")
+  deleteFileRecord(id)
   revalidatePath("/admin/files")
 }
 
-export async function deleteFile(id: string) {
-  const user = await getSession()
-  if (!user) throw new Error("Unauthorized")
+export async function getAdminSettings() {
+  const authed = await isAuthenticated()
+  if (!authed) throw new Error("Unauthorized")
+  const s = getSettings()
+  return {
+    uploads_enabled: s.uploads_enabled,
+    max_file_size_mb: s.max_file_size_mb,
+    allowed_formats: s.allowed_formats,
+  }
+}
 
-  const db = getDb()
+export async function saveAdminSettings(data: {
+  uploads_enabled: boolean
+  max_file_size_mb: number
+  allowed_formats: string
+}) {
+  const authed = await isAuthenticated()
+  if (!authed) throw new Error("Unauthorized")
+  updateSettings(data)
+  revalidatePath("/admin/settings")
+}
 
-  // Get file path first
-  const file = db.prepare("SELECT file_path FROM files WHERE id = ?").get(id) as
-    | { file_path: string }
-    | undefined
+export async function adminChangePassword(currentPassword: string, newPassword: string) {
+  const authed = await isAuthenticated()
+  if (!authed) throw new Error("Unauthorized")
 
-  if (file) {
-    const fullPath = path.join(UPLOADS_DIR, file.file_path)
-    if (fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath)
-    }
+  if (!verifyPassword(currentPassword)) {
+    return { success: false, error: "Current password is incorrect" }
   }
 
-  db.prepare("DELETE FROM files WHERE id = ?").run(id)
-  revalidatePath("/admin/files")
+  if (newPassword.length < 4) {
+    return { success: false, error: "New password must be at least 4 characters" }
+  }
+
+  changeAdminPassword(newPassword)
+  return { success: true }
 }

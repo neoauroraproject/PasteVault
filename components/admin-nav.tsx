@@ -3,15 +3,16 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Shield, FileText, Upload, LogOut } from "lucide-react"
+import { Shield, FileText, Upload, Settings, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
-  { href: "/admin", label: "Configs", icon: FileText },
+  { href: "/admin", label: "Pastes", icon: FileText },
   { href: "/admin/files", label: "Files", icon: Upload },
+  { href: "/admin/settings", label: "Settings", icon: Settings },
 ]
 
-export function AdminNav({ username }: { username: string }) {
+export function AdminNav() {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -26,9 +27,7 @@ export function AdminNav({ username }: { username: string }) {
       <div className="flex items-center gap-6">
         <Link href="/admin" className="flex items-center gap-2">
           <Shield className="h-5 w-5 text-primary" />
-          <span className="text-sm font-semibold text-foreground">
-            ConfigVault
-          </span>
+          <span className="text-sm font-semibold text-foreground">PasteVault Admin</span>
         </Link>
         <nav className="flex items-center gap-1">
           {navItems.map((item) => {
@@ -42,27 +41,29 @@ export function AdminNav({ username }: { username: string }) {
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "gap-2 text-muted-foreground hover:text-foreground hover:bg-accent",
-                    isActive && "text-foreground bg-accent"
+                    "gap-2 text-muted-foreground hover:text-foreground",
+                    isActive && "text-foreground bg-muted"
                   )}
                 >
                   <item.icon className="h-4 w-4" />
-                  {item.label}
+                  <span className="hidden sm:inline">{item.label}</span>
                 </Button>
               </Link>
             )
           })}
         </nav>
       </div>
-      <div className="flex items-center gap-3">
-        <span className="hidden text-xs text-muted-foreground md:inline">
-          {username}
-        </span>
+      <div className="flex items-center gap-2">
+        <Link href="/">
+          <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-foreground">
+            View Site
+          </Button>
+        </Link>
         <Button
           variant="ghost"
           size="sm"
           onClick={handleLogout}
-          className="gap-2 text-muted-foreground hover:text-foreground hover:bg-accent"
+          className="gap-2 text-muted-foreground hover:text-foreground"
         >
           <LogOut className="h-4 w-4" />
           <span className="hidden md:inline">Logout</span>
