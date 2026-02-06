@@ -2,148 +2,238 @@
 set -e
 
 # ============================================================
-# PasteVault - One-line installer for Ubuntu
-# Usage: sudo bash install.sh [PORT] [ADMIN_PASSWORD]
-# Example: sudo bash install.sh 3000 mysecretpass
+#  PasteVault - Interactive Installer for Ubuntu
+#  Usage: sudo bash install.sh
 # ============================================================
 
-PORT="${1:-3000}"
-ADMIN_PASSWORD="${2:-admin}"
 INSTALL_DIR="/opt/pastevault"
 SERVICE_NAME="pastevault"
 NODE_VERSION="20"
+CONFIG_FILE="$INSTALL_DIR/config.env"
 
+clear
 echo ""
-echo "========================================"
-echo "  PasteVault Installer"
-echo "========================================"
-echo "  Port:     $PORT"
-echo "  Install:  $INSTALL_DIR"
-echo "========================================"
+echo "  ____           _    __     __          _ _   "
+echo " |  _ \\ __ _ ___| |_ __\\ \\   / /_ _ _   _| | |_ "
+echo " | |_) / _\` / __| __/ _ \\ \\ / / _\` | | | | | __|"
+echo " |  __/ (_| \\__ \\ ||  __/\\ V / (_| | |_| | | |_ "
+echo " |_|   \\__,_|___/\\__\\___| \\_/ \\__,_|\\__,_|_|\\__|"
+echo ""
+echo " ------------------------------------------------"
+echo "  Paste & File Sharing - Self Hosted"
+echo " ------------------------------------------------"
 echo ""
 
 # Check root
 if [ "$EUID" -ne 0 ]; then
-  echo "ERROR: Please run as root (sudo bash install.sh)"
+  echo "  ERROR: Please run as root"
+  echo "  sudo bash install.sh"
+  echo ""
   exit 1
 fi
 
-# Install Node.js if not present
+# ---- Interactive Prompts ----
+
+read -p "  Port to run on [3000]: " INPUT_PORT
+PORT="${INPUT_PORT:-3000}"
+
+read -p "  Admin password [admin]: " INPUT_PASS
+ADMIN_PASSWORD="${INPUT_PASS:-admin}"
+
+echo ""
+echo "  SSL Configuration (optional)"
+echo "  Leave blank to skip (HTTP only)"
+read -p "  SSL cert path (fullchain.pem): " SSL_CERT
+read -p "  SSL key path  (privkey.pem):   " SSL_KEY
+
+echo ""
+echo " ------------------------------------------------"
+echo "  Port:     $PORT"
+echo "  Install:  $INSTALL_DIR"
+if [ -n "$SSL_CERT" ] && [ -n "$SSL_KEY" ]; then
+  echo "  SSL:      Enabled"
+  echo "  Cert:     $SSL_CERT"
+  echo "  Key:      $SSL_KEY"
+else
+  echo "  SSL:      Disabled (HTTP)"
+fi
+echo " ------------------------------------------------"
+echo ""
+read -p "  Continue? (Y/n) " CONFIRM
+if [[ "$CONFIRM" =~ ^[Nn]$ ]]; then
+  echo "  Cancelled."
+  exit 0
+fi
+
+echo ""
+
+# ---- Install Node.js ----
 if ! command -v node &> /dev/null; then
-  echo "[1/6] Installing Node.js $NODE_VERSION..."
+  echo "  [1/6] Installing Node.js $NODE_VERSION..."
   apt-get update -qq
   apt-get install -y -qq curl gnupg ca-certificates
   curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
   apt-get install -y -qq nodejs
 else
-  echo "[1/6] Node.js already installed: $(node -v)"
+  echo "  [1/6] Node.js found: $(node -v)"
 fi
 
-# Install build tools for better-sqlite3
-echo "[2/6] Installing build dependencies..."
+# ---- Build tools ----
+echo "  [2/6] Installing build dependencies..."
 apt-get install -y -qq build-essential python3 2>/dev/null || true
 
-# Install pnpm if not present
+# ---- pnpm ----
 if ! command -v pnpm &> /dev/null; then
-  echo "[3/6] Installing pnpm..."
+  echo "  [3/6] Installing pnpm..."
   npm install -g pnpm
 else
-  echo "[3/6] pnpm already installed"
+  echo "  [3/6] pnpm found"
 fi
 
-# Copy project files
-echo "[4/6] Setting up project in $INSTALL_DIR..."
+# ---- Copy project ----
+echo "  [4/6] Setting up project..."
+
 if [ -d "$INSTALL_DIR/data" ]; then
-  echo "  Backing up existing data..."
-  cp -r "$INSTALL_DIR/data" "/tmp/pastevault_data_backup" 2>/dev/null || true
+  cp -r "$INSTALL_DIR/data" "/tmp/pastevault_backup" 2>/dev/null || true
 fi
 
 mkdir -p "$INSTALL_DIR"
 cp -r . "$INSTALL_DIR/"
 cd "$INSTALL_DIR"
 
-# Restore data if backup exists
-if [ -d "/tmp/pastevault_data_backup" ]; then
-  cp -r "/tmp/pastevault_data_backup" "$INSTALL_DIR/data"
-  rm -rf "/tmp/pastevault_data_backup"
+if [ -d "/tmp/pastevault_backup" ]; then
+  cp -r "/tmp/pastevault_backup" "$INSTALL_DIR/data"
+  rm -rf "/tmp/pastevault_backup"
 fi
 
 mkdir -p "$INSTALL_DIR/data/uploads"
 
-# Create .env before build
-cat > "$INSTALL_DIR/.env" <<EOF
+# ---- Config file ----
+SESSION_SECRET=$(openssl rand -hex 32)
+
+cat > "$CONFIG_FILE" <<ENVEOF
+# PasteVault Configuration
+# Edit this file and restart: sudo systemctl restart pastevault
+
 PORT=$PORT
 NODE_ENV=production
-SESSION_SECRET=$(openssl rand -hex 32)
+HOSTNAME=0.0.0.0
+SESSION_SECRET=$SESSION_SECRET
 ADMIN_PASSWORD=$ADMIN_PASSWORD
 DATA_DIR=$INSTALL_DIR/data
-HOSTNAME=0.0.0.0
-EOF
 
-# Install dependencies (including better-sqlite3)
-echo "[5/6] Installing dependencies and building..."
+# SSL (leave empty to disable)
+SSL_CERT=$SSL_CERT
+SSL_KEY=$SSL_KEY
+ENVEOF
+
+# Also write .env for the build
+cp "$CONFIG_FILE" "$INSTALL_DIR/.env"
+
+# ---- Build ----
+echo "  [5/6] Installing dependencies & building..."
 cd "$INSTALL_DIR"
-pnpm install --no-frozen-lockfile
-pnpm run build
+pnpm install --no-frozen-lockfile 2>&1 | tail -3
+pnpm add better-sqlite3 2>&1 | tail -3
+pnpm run build 2>&1 | tail -5
 
-# Create systemd service
-echo "[6/6] Creating systemd service..."
-cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
+# ---- Standalone setup ----
+mkdir -p "$INSTALL_DIR/.next/standalone/.next"
+cp -r "$INSTALL_DIR/.next/static" "$INSTALL_DIR/.next/standalone/.next/static" 2>/dev/null || true
+cp -r "$INSTALL_DIR/public" "$INSTALL_DIR/.next/standalone/public" 2>/dev/null || true
+
+# Copy native modules
+for mod in better-sqlite3 bindings file-uri-to-path prebuild-install; do
+  cp -r "$INSTALL_DIR/node_modules/$mod" "$INSTALL_DIR/.next/standalone/node_modules/$mod" 2>/dev/null || true
+done
+
+# ---- Create custom HTTPS server if SSL ----
+if [ -n "$SSL_CERT" ] && [ -n "$SSL_KEY" ]; then
+  cat > "$INSTALL_DIR/server-ssl.js" <<'SSLEOF'
+const https = require("https");
+const fs = require("fs");
+const { parse } = require("url");
+const next = require("next");
+
+const dev = false;
+const hostname = process.env.HOSTNAME || "0.0.0.0";
+const port = parseInt(process.env.PORT || "3000", 10);
+
+const app = next({ dev, hostname, port, dir: __dirname });
+const handle = app.getRequestHandler();
+
+const sslOptions = {
+  cert: fs.readFileSync(process.env.SSL_CERT),
+  key: fs.readFileSync(process.env.SSL_KEY),
+};
+
+app.prepare().then(() => {
+  https.createServer(sslOptions, (req, res) => {
+    const parsedUrl = parse(req.url, true);
+    handle(req, res, parsedUrl);
+  }).listen(port, hostname, () => {
+    console.log(`> PasteVault running at https://${hostname}:${port}`);
+  });
+});
+SSLEOF
+  cp "$INSTALL_DIR/server-ssl.js" "$INSTALL_DIR/.next/standalone/server-ssl.js"
+  EXEC_CMD="$(which node) $INSTALL_DIR/.next/standalone/server-ssl.js"
+else
+  EXEC_CMD="$(which node) $INSTALL_DIR/.next/standalone/server.js"
+fi
+
+# ---- systemd service ----
+echo "  [6/6] Creating systemd service..."
+cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<SVCEOF
 [Unit]
-Description=PasteVault - Paste and File Sharing
+Description=PasteVault
 After=network.target
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=$INSTALL_DIR/.next/standalone
-ExecStart=$(which node) $INSTALL_DIR/.next/standalone/server.js
+ExecStart=$EXEC_CMD
 Restart=always
 RestartSec=5
-EnvironmentFile=$INSTALL_DIR/.env
+EnvironmentFile=$CONFIG_FILE
 
 [Install]
 WantedBy=multi-user.target
-EOF
-
-# Copy static files for standalone mode
-mkdir -p "$INSTALL_DIR/.next/standalone/.next"
-cp -r "$INSTALL_DIR/.next/static" "$INSTALL_DIR/.next/standalone/.next/static" 2>/dev/null || true
-cp -r "$INSTALL_DIR/public" "$INSTALL_DIR/.next/standalone/public" 2>/dev/null || true
-
-# Copy better-sqlite3 native module into standalone
-cp -r "$INSTALL_DIR/node_modules/better-sqlite3" "$INSTALL_DIR/.next/standalone/node_modules/better-sqlite3" 2>/dev/null || true
-cp -r "$INSTALL_DIR/node_modules/bindings" "$INSTALL_DIR/.next/standalone/node_modules/bindings" 2>/dev/null || true
-cp -r "$INSTALL_DIR/node_modules/prebuild-install" "$INSTALL_DIR/.next/standalone/node_modules/prebuild-install" 2>/dev/null || true
-cp -r "$INSTALL_DIR/node_modules/file-uri-to-path" "$INSTALL_DIR/.next/standalone/node_modules/file-uri-to-path" 2>/dev/null || true
+SVCEOF
 
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 systemctl restart "$SERVICE_NAME"
 
+PROTOCOL="http"
+if [ -n "$SSL_CERT" ] && [ -n "$SSL_KEY" ]; then
+  PROTOCOL="https"
+fi
+
 echo ""
-echo "========================================"
-echo "  PasteVault installed successfully!"
-echo "========================================"
+echo " ================================================"
+echo "  PasteVault installed!"
+echo " ================================================"
 echo ""
-echo "  URL:      http://localhost:$PORT"
-echo "  Admin:    http://localhost:$PORT/auth/login"
-echo "  Password: $ADMIN_PASSWORD"
-echo "  Data:     $INSTALL_DIR/data/"
-echo "  Database: $INSTALL_DIR/data/pastevault.db"
+echo "  URL:       $PROTOCOL://localhost:$PORT"
+echo "  Admin:     $PROTOCOL://localhost:$PORT/auth/login"
+echo "  Password:  $ADMIN_PASSWORD"
+echo ""
+echo "  Config:    $CONFIG_FILE"
+echo "  Database:  $INSTALL_DIR/data/pastevault.db"
+echo "  Uploads:   $INSTALL_DIR/data/uploads/"
 echo ""
 echo "  Commands:"
-echo "    sudo systemctl status $SERVICE_NAME"
-echo "    sudo systemctl restart $SERVICE_NAME"
-echo "    sudo systemctl stop $SERVICE_NAME"
-echo "    sudo journalctl -u $SERVICE_NAME -f"
+echo "    systemctl status  $SERVICE_NAME"
+echo "    systemctl restart $SERVICE_NAME"
+echo "    systemctl stop    $SERVICE_NAME"
+echo "    journalctl -u $SERVICE_NAME -f"
 echo ""
-echo "  To uninstall:"
-echo "    sudo systemctl stop $SERVICE_NAME"
-echo "    sudo systemctl disable $SERVICE_NAME"
-echo "    sudo rm /etc/systemd/system/${SERVICE_NAME}.service"
-echo "    sudo rm -rf $INSTALL_DIR"
+echo "  Change admin password:"
+echo "    1. Edit $CONFIG_FILE"
+echo "    2. sudo systemctl restart $SERVICE_NAME"
 echo ""
-echo "  IMPORTANT: Change the default admin password"
-echo "  after first login!"
+echo "  Design and developed by Hmray"
+echo "  https://t.me/hmrayserver"
 echo ""
