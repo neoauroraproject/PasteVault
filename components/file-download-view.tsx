@@ -1,7 +1,13 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card"
 import { Download, FileIcon, ImageIcon } from "lucide-react"
 
 function formatSize(bytes: number) {
@@ -9,7 +15,7 @@ function formatSize(bytes: number) {
   const k = 1024
   const sizes = ["B", "KB", "MB", "GB"]
   const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+  return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
 }
 
 interface FileDownloadViewProps {
@@ -17,7 +23,7 @@ interface FileDownloadViewProps {
   originalName: string
   fileSize: number
   mimeType: string | null
-  publicUrl: string
+  downloadUrl: string
 }
 
 export function FileDownloadView({
@@ -25,7 +31,7 @@ export function FileDownloadView({
   originalName,
   fileSize,
   mimeType,
-  publicUrl,
+  downloadUrl,
 }: FileDownloadViewProps) {
   const isImage = mimeType?.startsWith("image/")
 
@@ -50,13 +56,18 @@ export function FileDownloadView({
             <div className="overflow-hidden rounded-lg border border-border">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={publicUrl || "/placeholder.svg"}
+                src={downloadUrl || "/placeholder.svg"}
                 alt={fileName}
                 className="w-full object-contain"
               />
             </div>
           )}
-          <a href={publicUrl} download={originalName} target="_blank" rel="noopener noreferrer">
+          <a
+            href={downloadUrl}
+            download={originalName}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             <Button className="w-full gap-2">
               <Download className="h-4 w-4" />
               Download File

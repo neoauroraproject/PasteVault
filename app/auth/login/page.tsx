@@ -1,18 +1,21 @@
 "use client"
 
-import React from "react"
-
-import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import React, { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card"
 import { Shield } from "lucide-react"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -23,17 +26,27 @@ export default function LoginPage() {
     setLoading(true)
     setError("")
 
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      })
 
-    if (error) {
-      setError(error.message)
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || "Login failed")
+        setLoading(false)
+        return
+      }
+
+      router.push("/admin")
+      router.refresh()
+    } catch {
+      setError("Something went wrong")
       setLoading(false)
-      return
     }
-
-    router.push("/admin")
-    router.refresh()
   }
 
   return (
@@ -51,19 +64,23 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="email" className="text-foreground">Email</Label>
+              <Label htmlFor="username" className="text-foreground">
+                Username
+              </Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="admin@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="username"
+                type="text"
+                placeholder="admin"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
                 className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="password" className="text-foreground">Password</Label>
+              <Label htmlFor="password" className="text-foreground">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -74,12 +91,13 @@ export default function LoginPage() {
                 className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
               />
             </div>
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" disabled={loading} className="w-full">
               {loading ? "Signing in..." : "Sign In"}
             </Button>
+            <p className="text-center text-xs text-muted-foreground">
+              Default: admin / admin
+            </p>
           </form>
         </CardContent>
       </Card>

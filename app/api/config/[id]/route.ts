@@ -1,5 +1,12 @@
-import { createClient } from "@/lib/supabase/server"
+import { getDb } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
+
+interface ConfigRow {
+  content: string
+  password: string | null
+  enabled: number
+  expires_at: string | null
+}
 
 export async function POST(
   request: NextRequest,
@@ -14,13 +21,10 @@ export async function POST(
       return NextResponse.json({ error: "Password is required" }, { status: 400 })
     }
 
-    const supabase = await createClient()
-    const { data: config } = await supabase
-      .from("configs")
-      .select("content, password, enabled, expires_at")
-      .eq("id", id)
-      .eq("enabled", true)
-      .single()
+    const db = getDb()
+    const config = db
+      .prepare("SELECT content, password, enabled, expires_at FROM configs WHERE id = ? AND enabled = 1")
+      .get(id) as ConfigRow | undefined
 
     if (!config) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })

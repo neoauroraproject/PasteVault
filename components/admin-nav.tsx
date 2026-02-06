@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Shield, FileText, Upload, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -12,13 +11,12 @@ const navItems = [
   { href: "/admin/files", label: "Files", icon: Upload },
 ]
 
-export function AdminNav({ email }: { email: string }) {
+export function AdminNav({ username }: { username: string }) {
   const pathname = usePathname()
   const router = useRouter()
 
   async function handleLogout() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    await fetch("/api/auth/logout", { method: "POST" })
     router.push("/auth/login")
     router.refresh()
   }
@@ -28,13 +26,16 @@ export function AdminNav({ email }: { email: string }) {
       <div className="flex items-center gap-6">
         <Link href="/admin" className="flex items-center gap-2">
           <Shield className="h-5 w-5 text-primary" />
-          <span className="text-sm font-semibold text-foreground">ConfigVault</span>
+          <span className="text-sm font-semibold text-foreground">
+            ConfigVault
+          </span>
         </Link>
         <nav className="flex items-center gap-1">
           {navItems.map((item) => {
-            const isActive = item.href === "/admin"
-              ? pathname === "/admin"
-              : pathname.startsWith(item.href)
+            const isActive =
+              item.href === "/admin"
+                ? pathname === "/admin"
+                : pathname.startsWith(item.href)
             return (
               <Link key={item.href} href={item.href}>
                 <Button
@@ -54,7 +55,9 @@ export function AdminNav({ email }: { email: string }) {
         </nav>
       </div>
       <div className="flex items-center gap-3">
-        <span className="hidden text-xs text-muted-foreground md:inline">{email}</span>
+        <span className="hidden text-xs text-muted-foreground md:inline">
+          {username}
+        </span>
         <Button
           variant="ghost"
           size="sm"

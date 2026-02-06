@@ -1,6 +1,19 @@
-import { createClient } from "@/lib/supabase/server"
+import { getDb } from "@/lib/db"
 import { notFound } from "next/navigation"
 import { FileDownloadView } from "@/components/file-download-view"
+
+export const dynamic = "force-dynamic"
+
+interface FileRow {
+  id: string
+  name: string
+  original_name: string
+  file_path: string
+  file_size: number
+  mime_type: string | null
+  expires_at: string | null
+  enabled: number
+}
 
 export default async function PublicFilePage({
   params,
@@ -8,14 +21,15 @@ export default async function PublicFilePage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const supabase = await createClient()
 
-  const { data: file } = await supabase
-    .from("files")
-    .select("*")
-    .eq("id", id)
-    .eq("enabled", true)
-    .single()
+  if (!/^[a-f0-9-]{36}$/i.test(id)) {
+    notFound()
+  }
+
+  const db = getDb()
+  const file = db
+    .prepare("SELECT * FROM files WHERE id = ? AND enabled = 1")
+    .get(id) as FileRow | undefined
 
   if (!file) {
     notFound()
@@ -26,18 +40,13 @@ export default async function PublicFilePage({
     notFound()
   }
 
-  // Get public URL for the file
-  const { data: urlData } = supabase.storage
-    .from("uploads")
-    .getPublicUrl(file.file_path)
-
   return (
     <FileDownloadView
       fileName={file.name}
       originalName={file.original_name}
       fileSize={file.file_size}
       mimeType={file.mime_type}
-      publicUrl={urlData.publicUrl}
+      downloadUrl={`/api/files/serve/${file.id}`}
     />
   )
 }

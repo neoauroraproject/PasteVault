@@ -1,10 +1,7 @@
 "use client"
 
-import React from "react"
-
-import { useState, useRef } from "react"
+import React, { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -34,8 +31,6 @@ export function FileUploadForm() {
     try {
       const formData = new FormData(e.currentTarget)
       const file = formData.get("file") as File
-      const name = formData.get("name") as string
-      const expiresAt = (formData.get("expires_at") as string) || null
 
       if (!file || file.size === 0) {
         toast.error("Please select a file")
@@ -49,40 +44,25 @@ export function FileUploadForm() {
         return
       }
 
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("Unauthorized")
-
-      // Upload file to storage
-      const ext = file.name.split(".").pop()
-      const filePath = `${user.id}/${Date.now()}-${name}.${ext}`
-
-      const { error: uploadError } = await supabase.storage
-        .from("uploads")
-        .upload(filePath, file)
-
-      if (uploadError) throw uploadError
-
-      // Create file record
-      const { error: dbError } = await supabase.from("files").insert({
-        name,
-        original_name: file.name,
-        file_path: filePath,
-        file_size: file.size,
-        mime_type: file.type || "application/octet-stream",
-        expires_at: expiresAt || null,
-        enabled: true,
-        user_id: user.id,
+      const res = await fetch("/api/files/upload", {
+        method: "POST",
+        body: formData,
       })
 
-      if (dbError) throw dbError
+      const data = await res.json()
+
+      if (!res.ok) {
+        toast.error(data.error || "Upload failed")
+        setLoading(false)
+        return
+      }
 
       toast.success("File uploaded")
       setOpen(false)
       setFileName("")
       router.refresh()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Upload failed")
+    } catch {
+      toast.error("Upload failed")
     } finally {
       setLoading(false)
     }
@@ -102,7 +82,9 @@ export function FileUploadForm() {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="name" className="text-foreground">Display Name</Label>
+            <Label htmlFor="name" className="text-foreground">
+              Display Name
+            </Label>
             <Input
               id="name"
               name="name"
@@ -112,12 +94,15 @@ export function FileUploadForm() {
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="file" className="text-foreground">File</Label>
+            <Label htmlFor="file" className="text-foreground">
+              File
+            </Label>
             <div
               className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border px-4 py-8 transition-colors hover:border-muted-foreground"
               onClick={() => fileRef.current?.click()}
               onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") fileRef.current?.click()
+                if (e.key === "Enter" || e.key === " ")
+                  fileRef.current?.click()
               }}
               role="button"
               tabIndex={0}
@@ -142,7 +127,8 @@ export function FileUploadForm() {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="expires_at" className="text-foreground">
-              Expires <span className="text-muted-foreground">(optional)</span>
+              Expires{" "}
+              <span className="text-muted-foreground">(optional)</span>
             </Label>
             <Input
               id="expires_at"
