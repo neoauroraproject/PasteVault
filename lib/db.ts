@@ -29,6 +29,18 @@ export interface UploadedFile {
   created_at: string
 }
 
+export interface Config {
+  id: string
+  title: string
+  description: string
+  file_name: string
+  file_data: string // base64
+  file_size: number
+  uploader_name: string
+  status: "pending" | "approved" | "rejected"
+  created_at: string
+}
+
 export interface Settings {
   admin_password_hash: string
   uploads_enabled: boolean
@@ -106,6 +118,17 @@ function tryInitSqlite() {
           file_path TEXT NOT NULL DEFAULT '',
           created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS configs (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL DEFAULT '',
+          description TEXT NOT NULL DEFAULT '',
+          file_name TEXT NOT NULL,
+          file_data TEXT NOT NULL DEFAULT '',
+          file_size INTEGER NOT NULL DEFAULT 0,
+          uploader_name TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'pending',
+          created_at TEXT NOT NULL
+        );
       `)
 
       // Init default settings if empty
@@ -139,6 +162,7 @@ tryInitSqlite()
 const g = globalThis as unknown as {
   __pv_pastes?: Paste[]
   __pv_files?: UploadedFile[]
+  __pv_configs?: Config[]
   __pv_settings?: Settings
 }
 
@@ -149,6 +173,10 @@ function memPastes(): Paste[] {
 function memFiles(): UploadedFile[] {
   if (!g.__pv_files) g.__pv_files = []
   return g.__pv_files
+}
+function memConfigs(): Config[] {
+  if (!g.__pv_configs) g.__pv_configs = []
+  return g.__pv_configs
 }
 function memSettings(): Settings {
   if (!g.__pv_settings) g.__pv_settings = { ...DEFAULT_SETTINGS }
@@ -351,5 +379,86 @@ export function deleteFileRecord(id: string) {
   }
   const arr = memFiles()
   const idx = arr.findIndex((f) => f.id === id)
+  if (idx !== -1) arr.splice(idx, 1)
+}
+
+// ============================================================
+// Configs (v2ray donated configs)
+// ============================================================
+export function createConfig(
+  title: string,
+  description: string,
+  fileName: string,
+  fileData: string,
+  fileSize: number,
+  uploaderName: string
+): Config {
+  const config: Config = {
+    id: shortId(8),
+    title,
+    description,
+    file_name: fileName,
+    file_data: fileData,
+    file_size: fileSize,
+    uploader_name: uploaderName,
+    status: "pending",
+    created_at: new Date().toISOString(),
+  }
+  if (useSqlite) {
+    sqliteDb.prepare(
+      "INSERT INTO configs (id, title, description, file_name, file_data, file_size, uploader_name, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(config.id, config.title, config.description, config.file_name, config.file_data, config.file_size, config.uploader_name, config.status, config.created_at)
+  } else {
+    memConfigs().unshift(config)
+  }
+  return config
+}
+
+export function getApprovedConfigs(): Omit<Config, "file_data">[] {
+  if (useSqlite) {
+    return sqliteDb.prepare(
+      "SELECT id, title, description, file_name, file_size, uploader_name, status, created_at FROM configs WHERE status = 'approved' ORDER BY created_at DESC"
+    ).all()
+  }
+  return memConfigs()
+    .filter((c) => c.status === "approved")
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .map(({ file_data: _, ...rest }) => rest)
+}
+
+export function getAllConfigs(): Omit<Config, "file_data">[] {
+  if (useSqlite) {
+    return sqliteDb.prepare(
+      "SELECT id, title, description, file_name, file_size, uploader_name, status, created_at FROM configs ORDER BY created_at DESC"
+    ).all()
+  }
+  return memConfigs()
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .map(({ file_data: _, ...rest }) => rest)
+}
+
+export function getConfigFile(id: string): Config | null {
+  if (useSqlite) {
+    return sqliteDb.prepare("SELECT * FROM configs WHERE id = ?").get(id) || null
+  }
+  return memConfigs().find((c) => c.id === id) || null
+}
+
+export function updateConfigStatus(id: string, status: "approved" | "rejected") {
+  if (useSqlite) {
+    sqliteDb.prepare("UPDATE configs SET status = ? WHERE id = ?").run(status, id)
+    return
+  }
+  const c = memConfigs().find((c) => c.id === id)
+  if (c) c.status = status
+}
+
+export function deleteConfig(id: string) {
+  if (useSqlite) {
+    sqliteDb.prepare("DELETE FROM configs WHERE id = ?").run(id)
+    return
+  }
+  const arr = memConfigs()
+  const idx = arr.findIndex((c) => c.id === id)
   if (idx !== -1) arr.splice(idx, 1)
 }

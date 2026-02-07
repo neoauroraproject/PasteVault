@@ -116,18 +116,95 @@ apt-get update -qq > /dev/null 2>&1
 apt-get install -y -qq curl git build-essential python3 ca-certificates gnupg > /dev/null 2>&1
 
 # ---- Install Node.js ----
+install_node_nodesource() {
+  echo "         Trying NodeSource repository..."
+  if timeout 30 curl -fsSL "https://deb.nodesource.com/setup_${NODE_VERSION}.x" -o /tmp/nodesource_setup.sh 2>/dev/null; then
+    timeout 60 bash /tmp/nodesource_setup.sh > /dev/null 2>&1
+    apt-get install -y -qq nodejs > /dev/null 2>&1
+    rm -f /tmp/nodesource_setup.sh
+    if command -v node &> /dev/null; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+install_node_binary() {
+  echo "         Trying direct binary download..."
+  local ARCH
+  ARCH=$(dpkg --print-architecture 2>/dev/null || echo "amd64")
+  case "$ARCH" in
+    amd64) ARCH="x64" ;;
+    arm64|aarch64) ARCH="arm64" ;;
+    armhf) ARCH="armv7l" ;;
+  esac
+  local NODE_URL="https://nodejs.org/dist/v${NODE_VERSION}.19.0/node-v${NODE_VERSION}.19.0-linux-${ARCH}.tar.xz"
+  if timeout 60 curl -fsSL "$NODE_URL" -o /tmp/node.tar.xz 2>/dev/null; then
+    tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1
+    rm -f /tmp/node.tar.xz
+    if command -v node &> /dev/null; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+install_node_nvm() {
+  echo "         Trying NVM fallback..."
+  export NVM_DIR="/usr/local/nvm"
+  mkdir -p "$NVM_DIR"
+  if timeout 30 curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh" -o /tmp/nvm_install.sh 2>/dev/null; then
+    bash /tmp/nvm_install.sh > /dev/null 2>&1
+    rm -f /tmp/nvm_install.sh
+    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+    nvm install "$NODE_VERSION" > /dev/null 2>&1
+    # Symlink to make node/npm globally available
+    ln -sf "$NVM_DIR/versions/node/$(nvm version)/bin/node" /usr/local/bin/node 2>/dev/null
+    ln -sf "$NVM_DIR/versions/node/$(nvm version)/bin/npm" /usr/local/bin/npm 2>/dev/null
+    ln -sf "$NVM_DIR/versions/node/$(nvm version)/bin/npx" /usr/local/bin/npx 2>/dev/null
+    if command -v node &> /dev/null; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
 if ! command -v node &> /dev/null; then
   echo "  [2/7] Installing Node.js $NODE_VERSION..."
-  curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - > /dev/null 2>&1
-  apt-get install -y -qq nodejs > /dev/null 2>&1
+  if ! install_node_nodesource; then
+    if ! install_node_binary; then
+      if ! install_node_nvm; then
+        echo ""
+        echo "  ERROR: Failed to install Node.js $NODE_VERSION"
+        echo "  Please install Node.js manually and re-run this script:"
+        echo "    curl -fsSL https://nodejs.org/dist/v${NODE_VERSION}.19.0/node-v${NODE_VERSION}.19.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1"
+        echo ""
+        exit 1
+      fi
+    fi
+  fi
+  echo "         Installed: $(node -v)"
 else
-  echo "  [2/7] Node.js found: $(node -v)"
+  CURRENT_MAJOR=$(node -v | cut -d. -f1 | tr -d 'v')
+  if [ "$CURRENT_MAJOR" -lt "$NODE_VERSION" ]; then
+    echo "  [2/7] Node.js $(node -v) is too old, upgrading..."
+    if ! install_node_binary; then
+      install_node_nodesource || true
+    fi
+    echo "         Now using: $(node -v)"
+  else
+    echo "  [2/7] Node.js found: $(node -v)"
+  fi
 fi
 
 # ---- pnpm ----
 if ! command -v pnpm &> /dev/null; then
   echo "  [3/7] Installing pnpm..."
-  npm install -g pnpm > /dev/null 2>&1
+  npm install -g pnpm > /dev/null 2>&1 || {
+    echo "         npm failed, trying corepack..."
+    corepack enable > /dev/null 2>&1
+    corepack prepare pnpm@latest --activate > /dev/null 2>&1
+  }
 else
   echo "  [3/7] pnpm found: $(pnpm -v)"
 fi
@@ -195,9 +272,28 @@ cp "$CONFIG_FILE" "$INSTALL_DIR/.env"
 echo "  [6/7] Building (this may take a few minutes)..."
 cd "$INSTALL_DIR"
 rm -rf node_modules .next
-pnpm install --no-frozen-lockfile 2>&1 | tail -2
-pnpm add better-sqlite3 2>&1 | tail -2
-NODE_ENV=production pnpm run build 2>&1 | tail -3
+
+# Install dependencies with timeout
+echo "         Installing packages..."
+if ! timeout 300 pnpm install --no-frozen-lockfile 2>&1 | tail -5; then
+  echo ""
+  echo "  ERROR: pnpm install timed out or failed."
+  echo "  Try running manually:"
+  echo "    cd $INSTALL_DIR && pnpm install --no-frozen-lockfile"
+  echo ""
+  exit 1
+fi
+
+# Build
+echo "         Building Next.js..."
+if ! NODE_ENV=production timeout 300 pnpm run build 2>&1 | tail -5; then
+  echo ""
+  echo "  ERROR: Build failed."
+  echo "  Try running manually:"
+  echo "    cd $INSTALL_DIR && pnpm run build"
+  echo ""
+  exit 1
+fi
 
 # Standalone setup
 mkdir -p "$INSTALL_DIR/.next/standalone/.next"
